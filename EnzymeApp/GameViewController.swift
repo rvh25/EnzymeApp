@@ -9,61 +9,112 @@
 import UIKit
 import SpriteKit
 
-extension SKNode {
-    class func unarchiveFromFile(file : NSString) -> SKNode? {
-        if let path = NSBundle.mainBundle().pathForResource(file, ofType: "sks") {
-            var sceneData = NSData(contentsOfFile: path, options: .DataReadingMappedIfSafe, error: nil)!
-            var archiver = NSKeyedUnarchiver(forReadingWithData: sceneData)
-            
-            archiver.setClass(self.classForKeyedUnarchiver(), forClassName: "SKScene")
-            let scene = archiver.decodeObjectForKey(NSKeyedArchiveRootObjectKey) as GameScene
-            archiver.finishDecoding()
-            return scene
-        } else {
-            return nil
-        }
-    }
-}
-
-class GameViewController: UIViewController {
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-
-        if let scene = GameScene.unarchiveFromFile("GameScene") as? GameScene {
-            // Configure the view.
-            let skView = self.view as SKView
-            skView.showsFPS = true
-            skView.showsNodeCount = true
-            
-            /* Sprite Kit applies additional optimizations to improve rendering performance */
-            skView.ignoresSiblingOrder = true
-            
-            /* Set the scale mode to scale to fit the window */
-            scene.scaleMode = .AspectFill
-            
-            skView.presentScene(scene)
-        }
-    }
-
-    override func shouldAutorotate() -> Bool {
-        return true
-    }
-
-    override func supportedInterfaceOrientations() -> Int {
-        if UIDevice.currentDevice().userInterfaceIdiom == .Phone {
-            return Int(UIInterfaceOrientationMask.AllButUpsideDown.rawValue)
-        } else {
-            return Int(UIInterfaceOrientationMask.All.rawValue)
-        }
-    }
-
-    override func didReceiveMemoryWarning() {
-        super.didReceiveMemoryWarning()
-        // Release any cached data, images, etc that aren't in use.
-    }
-
+class GameViewController : UIViewController {
+    var scene : GameScene!
+    var level: Level!
+    
     override func prefersStatusBarHidden() -> Bool {
         return true
     }
+    
+    override func shouldAutorotate() -> Bool {
+        return true
+    }
+    
+    override func supportedInterfaceOrientations() -> Int {
+        return Int(UIInterfaceOrientationMask.AllButUpsideDown.rawValue)
+    }
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        //Configure the view
+        let skView = view as SKView
+        skView.multipleTouchEnabled = false
+        
+        //Create and configure the scene.
+        scene = GameScene(size: skView.bounds.size)
+        scene.scaleMode = .AspectFill
+        
+        level = Level()
+        scene.level = level
+        scene.swipeHandler = handleSwipe
+        
+        //Present the scene
+        skView.presentScene(scene)
+        
+        beginGame()
+    }
+    
+    func beginGame() {
+        shuffle()
+    }
+    
+    func shuffle() {
+        //scene.removeAllComponentSprites()
+        let newComponents = level.shuffle()
+        scene.addSpritesForComponents(newComponents)
+    }
+    
+    func handleSwipe(swap:Swap) {
+        view.userInteractionEnabled = false
+        
+        if level.isPossibleSwap(swap) {
+            level.performSwap(swap)
+        /*scene.animateSwap(swap){
+            self.view.userInteractionEnabled = true
+        }*/
+            scene.animateSwap(swap, completion: handleRxns)
+            /*scene.animateSwap(swap, completion:
+                {
+                self.view.userInteractionEnabled = true
+            })*/
+        } else {
+            //scene.direction()
+            //beginNextTurn()
+            //scene.animateInvalidSwap(swap) {
+                self.view.userInteractionEnabled = true
+            
+            //}
+        }
+        
+    }
+    
+    /*func handleRxns() {
+        let rxns = level.removepieces(component1: Component, component2: Component)
+        scene.removecomponents(rxns)
+    }*/
+    
+    func handleRxns() {
+        let rxns = level.removeRxns()
+        if rxns.count == 0 {
+            beginNextTurn()
+            return
+        }
+        scene.animateRxnComponents(rxns) {
+            self.handleRxns()
+            //self.view.userInteractionEnabled = true
+            /*let columns = self.level.newcomponents(columns) {
+                self.scene.animateNewComponents(columns) {
+                    self.handleRxns()
+                }
+            }*/
+        }
+    }
+    
+    /*func handleRxns() {
+        let columns = self.level.newcomponents()
+        self.scene.animateNewComponents(columns) {
+            self.view.userInteractionEnabled = true
+        }
+    }*/
+    
+    
+    
+    func beginNextTurn() {
+        level.detectPossibleSwaps()
+        view.userInteractionEnabled = true
+    }
+    
+
 }
